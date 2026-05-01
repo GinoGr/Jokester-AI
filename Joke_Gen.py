@@ -6,24 +6,24 @@ from torch.nn import functional as F
 import tiktoken
 
 #Hyperparameters
-max_iters = 20000
+max_iters = 5000 #From 20000
 eval_interval = 1000
-learning_rate = 3e-4
+learning_rate = 1e-3 #From 3e-4
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 eval_iters = 1000
 batch_size = 32 # how many sequences will we process in parallel
-block_size = 128 # what is the maximum context length for prediction
-n_embd = 256
-n_head = 4
-n_layers = 4
-dropout = 0.1
+block_size = 64 # what is the maximum context length for prediction, From 128
+n_embd = 256 #From 256
+n_head = 4 
+n_layers = 4 #From 2
+dropout = 0.1 #From .1
 checkpoint_path = "checkpoint.pt"
 
 torch.manual_seed(1337)
 torch.cuda.manual_seed_all(1337)
 
 #import data set of jokes
-df = pd.read_csv("shortjokes.csv")
+df = pd.read_csv("question_jokes.csv")
 
 text = '\n'.join(df['Joke'].astype(str))
 text = text.lower().strip()
@@ -38,6 +38,7 @@ vocab_size = enc.n_vocab
 
 
 #train and test splits
+print("Using GPU") if torch.cuda.is_available() else print("Using CPU")
 data = torch.tensor(encode(text), dtype=torch.long).to(device)
 n = int(0.9 * len(data)) #get first 90% of data for training
 train_data = data[:n]
