@@ -217,7 +217,7 @@ generated_jokes = []
 prompt = "why did"
 context = torch.tensor([encode(prompt)], dtype=torch.long, device=device)
 
-text = decode(m.generate(context, max_new_tokens=120)[0].tolist())
+text = decode(m.generate(context, max_new_tokens=1000)[0].tolist())
 jokes = text.split('\n')
 
 
