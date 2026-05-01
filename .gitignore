@@ -1,0 +1,4 @@
+*.pt
+checkpoint.pt
+joke_model.pt
+.venv/
