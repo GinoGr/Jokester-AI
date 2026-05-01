@@ -17,6 +17,7 @@ n_embd = 256
 n_head = 4
 n_layers = 4
 dropout = 0.1
+checkpoint_path = "checkpoint.pt"
 
 torch.manual_seed(1337)
 torch.cuda.manual_seed_all(1337)
@@ -54,15 +55,15 @@ def get_batch(split):
 @torch.no_grad() #No backprop here for efficiency
 def estimate_loss():
     out = {}
-    model.eval()
+    m.eval()
     for split in ['train', 'val']:
         losses = torch.zeros(eval_iters).to(device)
         for k in range(eval_iters):
             X, Y = get_batch(split)
-            logits, loss = model(X, Y)
+            logits, loss = m(X, Y)
             losses[k] = loss.item()
         out[split] = losses.mean()
-    model.train()
+    m.train()
     return out
 
 class Head(nn.Module):
@@ -189,38 +190,69 @@ class BigramLanguageModel(nn.Module):
 model = BigramLanguageModel()
 m = model.to(device)
 
-#create a pyTorch optimizer
-optimizer = torch.optim.AdamW(model.parameters(), lr = learning_rate)
+optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
 
-for iter in range(max_iters):
+start_iter = 0
 
-    #evalate the loss on train and val sets once in a while
-    if iter % eval_interval == 0:
-        losses = estimate_loss()
-        print(f"step {iter}: train loss: {losses['train']:.4f}, val loss: {losses['val']:.4f}")
-
-    #sample a batch of data
-    xb, yb = get_batch('train')
-    xb = xb
-    yb = yb
-
-    #evalate loss
-    logits, loss = model(xb, yb)
-    optimizer.zero_grad(set_to_none=True)
-    loss.backward()
-    optimizer.step()
-
-#generate from model
-num_jokes = 200
-generated_jokes = []
-
-prompt = "why did"
-context = torch.tensor([encode(prompt)], dtype=torch.long, device=device)
-
-text = decode(m.generate(context, max_new_tokens=1000)[0].tolist())
-jokes = text.split('\n')
+def save_checkpoint(iter_num, model, optimizer, loss=None, path=checkpoint_path):
+    torch.save({
+        "iter": iter_num,
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "loss": loss,
+        "config": {
+            "block_size": block_size,
+            "n_embd": n_embd,
+            "n_head": n_head,
+            "n_layers": n_layers,
+            "dropout": dropout,
+            "vocab_size": vocab_size,
+        }
+    }, path)
+    print(f"Checkpoint saved at step {iter_num} -> {path}")
 
 
-with open("generated_jokes.txt", "w", encoding="utf-8") as f:
-    for i, joke in enumerate(jokes):
-        f.write(f"{i+1}. {joke}\n")
+if os.path.exists(checkpoint_path):
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    m.load_state_dict(checkpoint["model_state_dict"])
+    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    start_iter = checkpoint["iter"] + 1
+    print(f"Resuming from step {start_iter}")
+else:
+    print("No checkpoint found. Starting fresh.")
+
+try:
+    for iter in range(start_iter, max_iters):
+
+        if iter % eval_interval == 0:
+            losses = estimate_loss()
+            print(f"step {iter}: train loss: {losses['train']:.4f}, val loss: {losses['val']:.4f}")
+            save_checkpoint(iter, m, optimizer, losses['val'].item())
+
+        xb, yb = get_batch('train')
+
+        logits, loss = m(xb, yb)
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+
+except KeyboardInterrupt:
+    print("\nTraining interrupted! Saving checkpoint...")
+    save_checkpoint(iter, m, optimizer, loss.item())
+    torch.save(m.state_dict(), "joke_model.pt")
+    print("Checkpoint saved. You can safely exit.")
+
+
+save_checkpoint(max_iters, m, optimizer, loss.item())
+torch.save({
+    "model_state_dict": m.state_dict(),
+    "config": {
+        "block_size": block_size,
+        "n_embd": n_embd,
+        "n_head": n_head,
+        "n_layers": n_layers,
+        "dropout": dropout,
+        "vocab_size": vocab_size,
+    }
+}, "joke_model.pt")
+print("Final model saved to joke_model.pt")
