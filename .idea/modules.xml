@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/Jokester-AI.iml" filepath="$PROJECT_DIR$/.idea/Jokester-AI.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/pydev.iml" filepath="$PROJECT_DIR$/.idea/pydev.iml" />
     </modules>
   </component>
 </project>
